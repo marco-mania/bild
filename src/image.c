@@ -63,35 +63,105 @@ void ImageDestroy(Image *image) {
 
 Image* ImageLoadFromBMPFileAndCreate(const char *filename) {
 
-  FreeImage_Initialise(FALSE);
+  FILE *bmp_file = fopen(filename, "rb");
 
-  FIBITMAP *bmp = FreeImage_Load(FIF_BMP, filename, BMP_DEFAULT);
+  if (bmp_file == NULL)
+  {
+    printf("Unable to open BMP file for reading.\n");
+    return NULL;
+  }
 
-  /*const int bpp = FreeImage_GetBPP(bmp);*/
-  const int w = FreeImage_GetWidth(bmp);
-  const int h = FreeImage_GetHeight(bmp);
+  BMPFileHeader bmp_fileheader;
+  if (!fread(&bmp_fileheader, sizeof(BMPFileHeader), 1, bmp_file))
+  {
+    printf("Unable to read BMP file header.\n");
+    return NULL;
+  }
+
+  if (bmp_fileheader.bfType != BMP_MAGIC)
+  {
+    printf("No valid BMP file.\n");
+    return NULL;
+  }
+
+  BMPInfoHeader bmp_infoheader;
+  if (!fread(&bmp_infoheader, sizeof(BMPInfoHeader), 1, bmp_file))
+  {
+    printf("Unable to read BMP info header.\n");
+    return NULL;
+  }
+
+  if (bmp_infoheader.biBitCount != 24)
+  {
+    printf("Only bitmaps of 24 bit color depth processable.\n");
+    return NULL;
+  }
+
+  if (bmp_infoheader.biCompression != 0)
+  {
+    printf("Unable to process compressed bitmaps.\n");
+    return NULL;
+  }
+
+  const int32_t w = bmp_infoheader.biWidth;
+  int32_t h = bmp_infoheader.biHeight;
+
+  bool topdown = false;
+  if (h < 0)
+  {
+    h = ABS(h);
+    topdown = true;
+  }
 
   Image *result = ImageCreate(w, h, RGB);
 
-  int x, y; byte *data;
-  for (y = 0; y < h; ++y)
+  const int data_size = 3*w*h;
+
+  uint8_t *buf = malloc(data_size);
+
+  if (fseek(bmp_file, bmp_fileheader.bfOffBits, SEEK_SET))
   {
-    data = FreeImage_GetScanLine(bmp, h-y-1);
-    for (x = 0; x < w; ++x) {
-      result->channels[0]->data[result->channels[0]->data_pos++] = data[FI_RGBA_RED];
-      result->channels[1]->data[result->channels[1]->data_pos++] = data[FI_RGBA_GREEN];
-      result->channels[2]->data[result->channels[2]->data_pos++] = data[FI_RGBA_BLUE];
-      data += 3;
+    printf("Unable to jump to data position in BMP.\n");
+    return NULL;
+  }
+
+  if (!fread(buf, sizeof(uint8_t), data_size, bmp_file))
+  {
+    printf("Unable to read BMP data.\n");
+    return NULL;
+  }
+
+  uint8_t *p = buf;
+  if (!topdown) p += (h-1)*w*3; /* set pointer to start of last line. */
+
+  int padBytes = w % 4;
+
+  int rewind = 2*w*3;
+  if (padBytes != 0) rewind += padBytes;
+
+  int i, j;
+  for (j = 0; j < h; ++j)
+  {
+    for (i = 0; i < w; ++i)
+    {
+      result->channels[2]->data[result->channels[2]->data_pos++] = *p++; /* B */
+      result->channels[1]->data[result->channels[1]->data_pos++] = *p++; /* G */
+      result->channels[0]->data[result->channels[0]->data_pos++] = *p++; /* R */
+    }
+    if (!topdown) {
+      p -= rewind; /* set pointer to start of previous line. */
+    } else {
+      if (padBytes != 0) p += padBytes;
     }
   }
+
+  free(buf);
 
   result->channels[0]->data_pos = 0;
   result->channels[1]->data_pos = 0;
   result->channels[2]->data_pos = 0;
 
-  FreeImage_Unload(bmp);
-
-  FreeImage_DeInitialise();
+  fclose(bmp_file);
 
   return result;
 
@@ -99,41 +169,103 @@ Image* ImageLoadFromBMPFileAndCreate(const char *filename) {
 
 void ImageSaveAsBMPFile(Image *image, const char *filename) {
 
-  if (image->colour_space != RGB) return;
+  if (image->colour_space != RGB)
+  {
+    printf("Only RGB can be written to BMP yet.\n");
+    return;
+  }
 
-  FreeImage_Initialise(FALSE);
+  FILE *bmp_file = fopen(filename, "wb");
 
-  const int bpp = 24;
-  const int w = image->width;
-  const int h = image->height;
+  if (bmp_file == NULL)
+  {
+    printf("Unable to open BMP file for writing.\n");
+    return;
+  }
 
-  FIBITMAP *bmp = FreeImage_Allocate(w, h, bpp, FI_RGBA_RED_MASK, FI_RGBA_GREEN_MASK, FI_RGBA_BLUE_MASK);
+  BMPFileHeader bmp_fileheader;
+  BMPInfoHeader bmp_infoheader;
+
+  bmp_fileheader.bfType = BMP_MAGIC;
+  bmp_fileheader.bfSize = sizeof(BMPFileHeader) + sizeof(BMPInfoHeader) + (3*image->width*image->height);
+  bmp_fileheader.bfReserved = 0;
+  bmp_fileheader.bfOffBits = 54;
+
+  bmp_infoheader.biSize = 40;
+  bmp_infoheader.biWidth = image->width;
+  bmp_infoheader.biHeight = image->height;
+  bmp_infoheader.biPlanes = 1;
+  bmp_infoheader.biBitCount = 24;
+  bmp_infoheader.biCompression = 0;
+  bmp_infoheader.biSizeImage = 0;
+  bmp_infoheader.biXPelsPerMeter = 0;
+  bmp_infoheader.biYPelsPerMeter = 0;
+  bmp_infoheader.biClrUsed = 0;
+  bmp_infoheader.biClrImportant = 0;
+
+  if (fwrite(&bmp_fileheader, sizeof(BMPFileHeader), 1, bmp_file) < 1)
+  {
+    printf("Unable to write BMP file header.\n");
+    return;
+  }
+
+  if (fwrite(&bmp_infoheader, sizeof(BMPInfoHeader), 1, bmp_file) < 1)
+  {
+    printf("Unable to write BMP info header.\n");
+    return;
+  }
+
+  const int data_size = 3*image->width*image->height;
+
+  uint8_t *buf = malloc(data_size);
+
+  const bool topdown = false;
+
+  uint8_t *p = buf;
+  if (!topdown) p += (image->height-1)*image->width*3; /* set pointer to start of last line. */
+
+  int padBytes = image->width % 4;
+
+  int rewind = 2*image->width*3;
+  if (padBytes != 0) rewind += padBytes;
+
+  const int dp0 = image->channels[0]->data_pos;
+  const int dp1 = image->channels[1]->data_pos;
+  const int dp2 = image->channels[2]->data_pos;
 
   image->channels[0]->data_pos = 0;
   image->channels[1]->data_pos = 0;
   image->channels[2]->data_pos = 0;
 
-  int x, y; byte *data;
-  for (y = 0; y < h; ++y)
+  int i, j;
+  for (j = 0; j < image->height; ++j)
   {
-    data = FreeImage_GetScanLine(bmp, h-y-1);
-    for (x = 0; x < w; ++x)
+    for (i = 0; i < image->width; ++i)
     {
-      data[FI_RGBA_RED] = CLIP(image->channels[0]->data[image->channels[0]->data_pos]);
-      data[FI_RGBA_GREEN] = CLIP(image->channels[1]->data[image->channels[1]->data_pos]);
-      data[FI_RGBA_BLUE] = CLIP(image->channels[2]->data[image->channels[2]->data_pos]);
-      ++image->channels[0]->data_pos;
-      ++image->channels[1]->data_pos;
-      ++image->channels[2]->data_pos;
-      data += 3;
+      *p++ = image->channels[2]->data[image->channels[2]->data_pos++]; /* B */
+      *p++ = image->channels[1]->data[image->channels[1]->data_pos++]; /* G */
+      *p++ = image->channels[0]->data[image->channels[0]->data_pos++]; /* R */
+    }
+    if (!topdown) {
+      p -= rewind; /* set pointer to start of previous line. */
+    } else {
+      if (padBytes != 0) p += padBytes;
     }
   }
 
-  FreeImage_Save(FIF_BMP, bmp, filename, 0);
+  image->channels[0]->data_pos = dp0;
+  image->channels[1]->data_pos = dp1;
+  image->channels[2]->data_pos = dp2;
 
-  FreeImage_Unload(bmp);
+  if (fwrite(buf, sizeof(uint8_t), data_size, bmp_file) < 1)
+  {
+    printf("Unable to write BMP data.\n");
+    return;
+  }
 
-  FreeImage_DeInitialise();
+  free(buf);
+
+  fclose(bmp_file);
 
 }
 
