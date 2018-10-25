@@ -146,9 +146,9 @@ Image *ImageLoadFromBILDFileAndCreate(const char *filename)
 
   start = clock();
 
-  Levels2D *l1 = p_FileToLevels(f, (header.quality > 0));
-  Levels2D *l2 = p_FileToLevels(f, (header.quality > 0));
-  Levels2D *l3 = p_FileToLevels(f, (header.quality > 0));
+  Levels2D *l1 = p_FileToLevels(f, (header.quality > 2));
+  Levels2D *l2 = p_FileToLevels(f, (header.quality > 2));
+  Levels2D *l3 = p_FileToLevels(f, (header.quality > 2));
 
   end = clock();
 
@@ -338,9 +338,9 @@ void ImageSaveAsBILDFile(Image *image, const char *filename, const int quality)
 
   start = clock();
 
-  p_LevelsToFile(l1, f, (quality > 0));
-  p_LevelsToFile(l2, f, (quality > 0));
-  p_LevelsToFile(l3, f, (quality > 0));
+  p_LevelsToFile(l1, f, (quality > 2));
+  p_LevelsToFile(l2, f, (quality > 2));
+  p_LevelsToFile(l3, f, (quality > 2));
 
   end = clock();
 
