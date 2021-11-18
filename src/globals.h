@@ -1,5 +1,5 @@
 /* BILD - Wavelet based image compression
- * All rights reserved (2014-2018). Marco Nelles. * All rights reserved (since 2004). Marco Nelles. * <https://gitlab.com/wavelets/bild>
+ * All rights reserved (since 2004). Marco Nelles.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
