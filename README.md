@@ -7,7 +7,7 @@ Features:
 
 * Compress/Uncompress images
 * Lossless and lossy mode
-* Fast
+* Only integer operations
 
 ### Prerequisites
 
