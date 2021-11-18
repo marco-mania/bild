@@ -9,15 +9,24 @@ Features:
 * Lossless and lossy mode
 * Only integer operations
 
-### Prerequisites
+## Prerequisites
 
-FreeImage (http://freeimage.sourceforge.net/)
+* [FreeImage](https://freeimage.sourceforge.io/)
 
-### Build
+## Build
 
-```Shell
-mkdir build
-cd build
-cmake -DCMAKE_BUILD_TYPE=Debug ..
-make
-```
+    mkdir build
+    cd build
+    cmake -DCMAKE_BUILD_TYPE=Debug ..
+    make
+
+## Contributing
+
+Pull requests are welcome. For major changes, please open an issue first to
+discuss what you would like to change.
+
+Please make sure to update tests as appropriate.
+
+## License
+
+[GPLv3](https://www.gnu.org/licenses/gpl-3.0.de.html)
